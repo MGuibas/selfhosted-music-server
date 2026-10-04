@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Spotify Privado</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet">
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Inter', sans-serif; }
+        body { background-color: #121212; color: #FFFFFF; display: flex; justify-content: center; min-height: 100vh; padding: 20px; }
+        .container { width: 100%; max-width: 650px; margin-top: 40px; }
+        .card { background: #181818; border: 1px solid #282828; border-radius: 16px; padding: 32px; box-shadow: 0 12px 32px rgba(0,0,0,0.6); margin-bottom: 24px; }
+        .title { display: flex; align-items: center; gap: 12px; font-size: 26px; font-weight: 800; color: #1DB954; margin-bottom: 8px; }
+        .subtitle { color: #B3B3B3; font-size: 14px; margin-bottom: 24px; }
+        .input-group { margin-bottom: 20px; }
+        label { display: block; font-size: 13px; font-weight: 600; color: #B3B3B3; margin-bottom: 8px; }
+        input[type="text"], input[type="password"] {
+            width: 100%; background: #282828; border: 1px solid #3E3E3E; border-radius: 10px; color: #fff; padding: 14px 16px; font-size: 15px; outline: none; transition: 0.2s;
+        }
+        input:focus { border-color: #1DB954; box-shadow: 0 0 0 2px rgba(29, 185, 84, 0.2); }
+        .btn {
+            width: 100%; background: #1DB954; color: #000; font-weight: 700; font-size: 16px; border: none; border-radius: 50px; padding: 14px; cursor: pointer; transition: 0.2s;
+        }
+        .btn:hover { background: #1ed760; transform: scale(1.01); }
+        .btn:disabled { background: #3E3E3E; color: #777; cursor: not-allowed; transform: none; }
+        
+        .badges { display: flex; gap: 8px; margin: 20px 0; }
+        .badge { flex: 1; background: #282828; border: 1px solid #3E3E3E; border-radius: 8px; padding: 10px 4px; text-align: center; font-size: 11px; font-weight: 600; color: #777; }
+        .badge.active { background: rgba(29, 185, 84, 0.15); border-color: #1DB954; color: #1DB954; }
+        .badge.done { border-color: #1DB954; color: #FFF; background: #222; }
+
+        .progress-bar-bg { width: 100%; background: #282828; height: 10px; border-radius: 5px; overflow: hidden; margin-bottom: 20px; }
+        .progress-bar-fill { width: 0%; height: 100%; background: #1DB954; transition: width 0.3s; }
+
+        .terminal { background: #000; border: 1px solid #282828; border-radius: 10px; padding: 16px; font-family: monospace; font-size: 13px; color: #1DB954; height: 220px; overflow-y: auto; white-space: pre-wrap; line-height: 1.4; }
+        .hidden { display: none !important; }
+        .error-msg { color: #ff5555; font-size: 14px; margin-top: 10px; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- LOGIN CARD -->
+        <div id="loginCard" class="card">
+            <div class="title">🎵 Spotify Privado</div>
+            <div class="subtitle">Introduce la contraseña para acceder al panel de control</div>
+            <div class="input-group">
+                <label>Contraseña</label>
+                <input type="password" id="passwordInput" placeholder="••••••••">
+            </div>
+            <button class="btn" onclick="login()">🔓 Iniciar Sesión</button>
+            <div id="loginError" class="error-msg hidden">Contraseña incorrecta</div>
+        </div>
+
+        <!-- MAIN APP CARD -->
+        <div id="appCard" class="card hidden">
+            <div class="title">🎵 Spotify Privado</div>
+            <div class="subtitle">Sincronizador automático: Spotify → MP3 → Navidrome</div>
+            
+            <div class="input-group">
+                <label>URL de la Playlist de Spotify</label>
+                <input type="text" id="urlInput" placeholder="https://open.spotify.com/playlist/...">
+            </div>
+            <button id="startBtn" class="btn" onclick="startSync()">▶ Iniciar Sincronización Completa</button>
+
+            <!-- PROGRESS SECTION -->
+            <div id="progressSection" class="hidden">
+                <div class="badges">
+                    <div id="b1" class="badge">1. Scraping</div>
+                    <div id="b2" class="badge">2. Descarga</div>
+                    <div id="b3" class="badge">3. Tags & Cover</div>
+                    <div id="b4" class="badge">4. Navidrome</div>
+                </div>
+                <div class="progress-bar-bg">
+                    <div id="progressFill" class="progress-bar-fill"></div>
+                </div>
+                <div id="terminal" class="terminal">Esperando logs...</div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let token = localStorage.getItem("auth_token") || "";
+
+        if (token) {
+            showApp();
+        }
+
+        async function login() {
+            const pwd = document.getElementById("passwordInput").value;
+            const res = await fetch("/api/login", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ password: pwd })
+            });
+            if (res.ok) {
+                token = pwd;
+                localStorage.setItem("auth_token", token);
+                document.getElementById("loginError").classList.add("hidden");
+                showApp();
+            } else {
+                document.getElementById("loginError").classList.remove("hidden");
+            }
+        }
+
+        function showApp() {
+            document.getElementById("loginCard").classList.add("hidden");
+            document.getElementById("appCard").classList.remove("hidden");
+            pollStatus();
+            setInterval(pollStatus, 1500);
+        }
+
+        async function startSync() {
+            const url = document.getElementById("urlInput").value.trim();
+            if (!url) return alert("Introduce una URL válida");
+
+            const res = await fetch("/api/start", {
+                method: "POST",
+                headers: { 
+                    "Content-Type": "application/json",
+                    "Authorization": token
+                },
+                body: JSON.stringify({ url })
+            });
+
+            if (!res.ok) {
+                const data = await res.json();
+                alert(data.error || "Error al iniciar");
+            } else {
+                pollStatus();
+            }
+        }
+
+        async function pollStatus() {
+            try {
+                const res = await fetch("/api/status", {
+                    headers: { "Authorization": token }
+                });
+                if (res.status === 401) {
+                    localStorage.removeItem("auth_token");
+                    location.reload();
+                    return;
+                }
+                const data = await res.json();
+                
+                if (data.running || data.has_logs) {
+                    document.getElementById("progressSection").classList.remove("hidden");
+                    document.getElementById("startBtn").disabled = data.running;
+
+                    const term = document.getElementById("terminal");
+                    term.textContent = data.logs || "Iniciando...";
+                    term.scrollTop = term.scrollHeight;
+
+                    const fill = document.getElementById("progressFill");
+                    fill.style.width = data.progress + "%";
+
+                    updateBadges(data.stage);
+                } else {
+                    document.getElementById("startBtn").disabled = false;
+                }
+            } catch(e) {}
+        }
+
+        function updateBadges(stage) {
+            for (let i = 1; i <= 4; i++) {
+                const b = document.getElementById("b" + i);
+                b.className = "badge";
+                if (i < stage) b.classList.add("done");
+                else if (i === stage) b.classList.add("active");
+            }
+        }
+    </script>
+</body>
+</html>
