@@ -79,6 +79,10 @@ y pulsa **Descargar**.
 
 Está en `http://localhost:8501` (o `http://IP_DEL_PC:8501` desde otro dispositivo de tu red).
 
+<div align="center">
+  <img src="docs/panel.png" alt="Panel web de Spotify Privado" width="420">
+</div>
+
 | Sección | Qué puedes hacer |
 |---|---|
 | **Descargar** | Pegar una o varias playlists (una URL por línea) y ver el progreso en directo |
