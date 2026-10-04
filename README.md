@@ -52,8 +52,8 @@ Docker Desktop tiene que estar **abierto** al instalar. ¿Prefieres no usar Dock
 ### Pasos
 
 ```bash
-git clone https://github.com/TU_USUARIO/spotify-privado.git
-cd spotify-privado
+git clone https://github.com/MGuibas/selfhosted-music-server.git
+cd selfhosted-music-server
 python setup.py
 ```
 
