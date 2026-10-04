@@ -1,5 +1,5 @@
 """Uso:
-    python -m spotifyprivado sync <URL> [--yes]
+    python -m spotifyprivado sync <URL> [<URL>...] [--yes]
     python -m spotifyprivado retag
     python -m spotifyprivado web
 """
@@ -18,13 +18,23 @@ USAGE = __doc__
 def sync(args: list[str]) -> int:
     auto = "--yes" in args or "-y" in args
     urls = [a for a in args if not a.startswith("-")]
-    url = urls[0] if urls else input("Pega la URL de la playlist de Spotify: ").strip()
-    if not url:
+    if not urls:
+        url = input("Pega la URL de la playlist de Spotify: ").strip()
+        urls = [url] if url else []
+    if not urls:
         print(USAGE)
         return 1
 
-    print("\n[1/4] Scraping playlist...")
-    tracks, covers = scrape_spotify(url)
+    print(f"\n[1/4] Leyendo {len(urls)} playlist(s)...")
+    tracks, covers, seen = [], {}, set()
+    for url in urls:
+        found, found_covers = scrape_spotify(url)
+        covers.update(found_covers)
+        for track in found:
+            key = track["track_id"] or (track["title"], track["artist"])
+            if key not in seen:
+                seen.add(key)
+                tracks.append(track)
     if not tracks:
         print("No se extrajeron tracks.")
         return 1
@@ -39,7 +49,7 @@ def sync(args: list[str]) -> int:
     ok, fail = download_batch(tracks)
     print("\n[3/4] Etiquetando y aplicando carátulas...")
     apply_tags_and_covers(covers)
-    print("\n[4/4] Scan de Navidrome...")
+    print("\n[4/4] Navidrome...")
     scan_navidrome()
     log(f"\nHecho: {ok} descargados, {fail} errores")
     return 0

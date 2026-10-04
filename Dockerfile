@@ -11,7 +11,7 @@ RUN pip install --no-cache-dir -r requirements.txt \
 
 COPY spotifyprivado ./spotifyprivado
 
-ENV MUSIC_DIR=/music PYTHONUNBUFFERED=1
+ENV MUSIC_DIR=/music CONFIG_DIR=/config PYTHONUNBUFFERED=1
 EXPOSE 8501
 
 CMD ["python", "-m", "spotifyprivado", "web"]

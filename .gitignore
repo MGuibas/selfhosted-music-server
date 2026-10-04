@@ -9,3 +9,4 @@ ffmpeg/
 *.log
 web_task.log
 web_task.json
+config/

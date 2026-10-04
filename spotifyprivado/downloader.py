@@ -2,7 +2,7 @@
 import subprocess
 from concurrent.futures import ThreadPoolExecutor
 
-from .config import BATCH_SIZE, HAS_FFMPEG, MUSIC_DIR, find_ytdlp
+from .config import HAS_FFMPEG, MUSIC_DIR, find_ytdlp, load_settings, ytdlp_quality
 from .log import log
 from .util import sanitize
 
@@ -18,7 +18,7 @@ def already_downloaded(track: dict) -> bool:
     return any((folder / f"{title}{ext}").exists() for ext in AUDIO_EXTS)
 
 
-def download_track(track: dict, idx: int, total: int, ytdlp: str) -> bool:
+def download_track(track: dict, idx: int, total: int, ytdlp: str, quality: str) -> bool:
     label = f"{track['artist']} - {track['title']}"
     if already_downloaded(track):
         log(f"  [{idx}/{total}] YA: {label}")
@@ -31,7 +31,7 @@ def download_track(track: dict, idx: int, total: int, ytdlp: str) -> bool:
     cmd = [
         ytdlp,
         "--extract-audio",
-        "--audio-quality", "0",
+        "--audio-quality", ytdlp_quality(quality),
         "--audio-format", ext[1:],
         "--format", "bestaudio/best",
         "--no-playlist",
@@ -60,15 +60,18 @@ def download_track(track: dict, idx: int, total: int, ytdlp: str) -> bool:
 
 def download_batch(tracks: list[dict]) -> tuple[int, int]:
     ytdlp = find_ytdlp()
+    cfg = load_settings()
+    quality, batch_size = cfg["quality"], cfg["batch_size"]
+    log(f"[DOWNLOAD] Calidad: {quality}, simultáneas: {batch_size}")
     total, ok = len(tracks), 0
-    n_batches = (total + BATCH_SIZE - 1) // BATCH_SIZE
+    n_batches = (total + batch_size - 1) // batch_size
 
-    for start in range(0, total, BATCH_SIZE):
-        batch = tracks[start:start + BATCH_SIZE]
-        log(f"\n[LOTE {start // BATCH_SIZE + 1}/{n_batches}] ({len(batch)} tracks)\n")
+    for start in range(0, total, batch_size):
+        batch = tracks[start:start + batch_size]
+        log(f"\n[LOTE {start // batch_size + 1}/{n_batches}] ({len(batch)} tracks)\n")
         with ThreadPoolExecutor(max_workers=len(batch)) as pool:
             futures = [
-                pool.submit(download_track, t, start + i + 1, total, ytdlp)
+                pool.submit(download_track, t, start + i + 1, total, ytdlp, quality)
                 for i, t in enumerate(batch)
             ]
             for f in futures:

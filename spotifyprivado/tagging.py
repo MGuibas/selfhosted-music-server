@@ -4,7 +4,7 @@ from mutagen.easyid3 import EasyID3
 from mutagen.id3 import APIC
 from mutagen.mp3 import MP3
 
-from .config import MUSIC_DIR
+from .config import MUSIC_DIR, load_settings
 from .log import log
 
 
@@ -56,6 +56,7 @@ def embed_cover(mp3_path, data: bytes) -> bool:
 def apply_tags_and_covers(covers: dict | None = None) -> None:
     """Recorre music/Artista/Album/*.mp3, corrige tags y pone la carátula."""
     covers = covers or {}
+    use_covers = load_settings()["covers"]
     mp3s = list(MUSIC_DIR.rglob("*.mp3"))
     if not mp3s:
         log("[TAGS] No hay MP3s para procesar.")
@@ -85,6 +86,9 @@ def apply_tags_and_covers(covers: dict | None = None) -> None:
         tags.save(str(mp3))
 
         album_dir = mp3.parent
+        if not use_covers:
+            log(f"  [OK] {principal} - {title}")
+            continue
         cover_file = album_dir / "cover.jpg"
         if album_dir not in seen_albums:
             seen_albums.add(album_dir)

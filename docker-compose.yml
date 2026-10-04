@@ -1,27 +1,31 @@
+# Normalmente no hace falta tocar nada aquí: ejecuta `python setup.py` y se genera .env.
+# Navidrome es opcional: solo arranca si COMPOSE_PROFILES=navidrome (lo escribe setup.py).
 services:
   web:
     build: .
     container_name: spotifyprivado-web
     ports:
-      - "8501:8501"
+      - "${WEB_PORT:-8501}:8501"
     volumes:
-      - ./music:/music
+      - ${MUSIC_PATH:-./music}:/music
+      - ./config:/config
     environment:
-      APP_PASSWORD: ${APP_PASSWORD:?Copia .env.example a .env y define APP_PASSWORD}
+      APP_PASSWORD: ${APP_PASSWORD:?Ejecuta python setup.py (o copia .env.example a .env y define APP_PASSWORD)}
+      NAVIDROME_ENABLED: ${NAVIDROME_ENABLED:-}
+      NAVIDROME_PORT: ${NAVIDROME_PORT:-4533}
       NAVIDROME_URL: http://navidrome:4533
       NAVIDROME_USER: ${NAVIDROME_USER:-}
       NAVIDROME_PASSWORD: ${NAVIDROME_PASSWORD:-}
     restart: unless-stopped
-    depends_on:
-      - navidrome
 
   navidrome:
+    profiles: ["navidrome"]
     image: deluan/navidrome:latest
     container_name: spotifyprivado-navidrome
     ports:
-      - "4533:4533"
+      - "${NAVIDROME_PORT:-4533}:4533"
     volumes:
-      - ./music:/music:ro
+      - ${MUSIC_PATH:-./music}:/music:ro
       - navidrome-data:/data
     environment:
       ND_SCANSCHEDULE: 5m

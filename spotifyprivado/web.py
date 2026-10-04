@@ -6,8 +6,19 @@ import re
 import subprocess
 import sys
 import threading
+import time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
+
+from .config import (
+    HAS_FFMPEG,
+    MUSIC_DIR,
+    NAVIDROME_ENABLED,
+    NAVIDROME_PORT,
+    QUALITIES,
+    load_settings,
+    save_settings,
+)
 
 PORT = int(os.environ.get("PORT", 8501))
 LOG_FILE = Path(os.environ.get("WEB_LOG_FILE", "web_task.log"))
@@ -30,16 +41,28 @@ def job_running() -> bool:
         return _proc is not None and _proc.poll() is None
 
 
-def start_job(url: str) -> None:
+def start_job(urls: list[str]) -> None:
     global _proc
     with _lock:
         with open(LOG_FILE, "w", encoding="utf-8") as fp:
             _proc = subprocess.Popen(
-                [sys.executable, "-m", "spotifyprivado", "sync", url, "--yes"],
+                [sys.executable, "-m", "spotifyprivado", "sync", *urls, "--yes"],
                 stdout=fp,
                 stderr=subprocess.STDOUT,
                 env={**os.environ, "PYTHONIOENCODING": "utf-8"},
             )
+
+
+_lib_cache = {"t": 0.0, "value": {"tracks": 0, "artists": 0}}
+
+
+def library_stats() -> dict:
+    """Cuenta canciones/artistas (cacheado 5 s para no recorrer el disco en cada petición)."""
+    if time.time() - _lib_cache["t"] > 5:
+        tracks = [p for ext in ("mp3", "m4a") for p in MUSIC_DIR.rglob(f"*.{ext}")] if MUSIC_DIR.exists() else []
+        artists = {p.relative_to(MUSIC_DIR).parts[0] for p in tracks}
+        _lib_cache.update(t=time.time(), value={"tracks": len(tracks), "artists": len(artists)})
+    return _lib_cache["value"]
 
 
 STAGES = (  # (marcador en el log, etapa, progreso mínimo)
@@ -87,6 +110,17 @@ def make_handler(password: str):
                 self.send_header("Content-Length", str(len(INDEX_HTML)))
                 self.end_headers()
                 self.wfile.write(INDEX_HTML)
+            elif self.path == "/api/config":
+                if not self.authed():
+                    return self.send_json({"error": "Unauthorized"}, 401)
+                self.send_json({
+                    "settings": load_settings(),
+                    "qualities": QUALITIES,
+                    "ffmpeg": HAS_FFMPEG,
+                    "navidrome": NAVIDROME_ENABLED,
+                    "navidrome_port": NAVIDROME_PORT,
+                    "library": library_stats(),
+                })
             elif self.path == "/api/status":
                 if not self.authed():
                     return self.send_json({"error": "Unauthorized"}, 401)
@@ -118,11 +152,15 @@ def make_handler(password: str):
                     return self.send_json({"error": "Unauthorized"}, 401)
                 if job_running():
                     return self.send_json({"error": "Ya hay una descarga en curso"}, 400)
-                url = str(data.get("url", "")).strip()
-                if not PLAYLIST_RE.match(url):
-                    return self.send_json({"error": "Pega una URL de playlist de open.spotify.com"}, 400)
-                start_job(url)
+                urls = [u.strip() for u in data.get("urls", []) if isinstance(u, str) and u.strip()]
+                if not urls or not all(PLAYLIST_RE.match(u) for u in urls):
+                    return self.send_json({"error": "Pega URLs de playlist de open.spotify.com (una por línea)"}, 400)
+                start_job(urls[:20])
                 self.send_json({"success": True})
+            elif self.path == "/api/settings":
+                if not self.authed():
+                    return self.send_json({"error": "Unauthorized"}, 401)
+                self.send_json({"settings": save_settings(data)})
             else:
                 self.send_error(404)
 

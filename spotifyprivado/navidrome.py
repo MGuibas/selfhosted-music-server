@@ -1,13 +1,16 @@
 """Pide a Navidrome que reescanee la biblioteca (API Subsonic)."""
 import requests
 
-from .config import NAVIDROME_PASSWORD, NAVIDROME_URL, NAVIDROME_USER
+from .config import NAVIDROME_ENABLED, NAVIDROME_PASSWORD, NAVIDROME_URL, NAVIDROME_USER
 from .log import log
 
 
 def scan_navidrome() -> None:
-    if not NAVIDROME_URL:
-        log("[SCAN] NAVIDROME_URL no definido: Navidrome detectará los cambios en su próximo escaneo programado.")
+    if not NAVIDROME_ENABLED:
+        log("[SCAN] Navidrome desactivado: solo se descarga la música.")
+        return
+    if not NAVIDROME_URL or not NAVIDROME_USER:
+        log("[SCAN] Sin reescaneo forzado: Navidrome detectará lo nuevo en su próximo escaneo (≤5 min).")
         return
     try:
         resp = requests.get(
