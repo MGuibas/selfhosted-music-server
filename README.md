@@ -1,8 +1,8 @@
 <div align="center">
 
-# 🎵 Spotify Privado
+# 🎵 Private Music
 
-**Tu propio "Spotify" casero: pega una playlist, descarga la música y escúchala donde quieras.**
+**Tu propia música en casa: pega una playlist, descarga la música y escúchala donde quieras.**
 
 [Instalación](#-instalación-en-3-pasos) ·
 [Panel web](#-el-panel-web) ·
@@ -80,7 +80,7 @@ y pulsa **Descargar**.
 Está en `http://localhost:8501` (o `http://IP_DEL_PC:8501` desde otro dispositivo de tu red).
 
 <div align="center">
-  <img src="docs/panel.png" alt="Panel web de Spotify Privado" width="420">
+  <img src="docs/panel.png" alt="Panel web de Private Music" width="420">
 </div>
 
 | Sección | Qué puedes hacer |
